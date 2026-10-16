@@ -1,4 +1,26 @@
-# projects
+# 私人文档库
+
+这是一个面向单用户的私人文档管理项目，基于 Next.js 16。当前已实现：
+
+- 管理员密码登录，不开放注册
+- HttpOnly 签名会话及登录失败限流
+- 文件列表、上传、下载和删除接口鉴权
+- 上传、删除和登录请求的同源校验
+- S3 兼容对象存储
+- Standalone 生产构建和健康检查接口
+
+首次启动前必须完成登录配置：
+
+```bash
+pnpm install --frozen-lockfile
+pnpm auth:hash -- "至少12位的管理员密码"
+```
+
+把生成结果填入 `.env.local` 的 `ADMIN_PASSWORD_HASH`，再设置至少 32 个字符的 `SESSION_SECRET`。完整变量见 `.env.example`。
+
+生产部署请阅读 [1 核 2G 部署说明](docs/DEPLOYMENT_1C2G.md)。
+
+## 原始项目说明
 
 这是一个基于 [Next.js 16](https://nextjs.org) + [shadcn/ui](https://ui.shadcn.com) 的全栈应用项目，由扣子编程 CLI 创建。
 

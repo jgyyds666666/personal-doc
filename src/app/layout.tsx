@@ -3,10 +3,15 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'File Vault - Document Manager',
-    template: '%s | File Vault',
+    default: '私人文档库',
+    template: '%s | 私人文档库',
   },
-  description: 'Upload, manage and download your documents with ease.',
+  description: '私人文档管理空间',
+  robots: {
+    index: false,
+    follow: false,
+    noarchive: true,
+  },
 };
 
 export default function RootLayout({
@@ -15,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="zh-CN">
       <body className={`antialiased`}>
         {children}
       </body>

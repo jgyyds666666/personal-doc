@@ -2,6 +2,8 @@ import type { NextConfig } from 'next';
 import path from 'path';
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
+  poweredByHeader: false,
   // outputFileTracingRoot: path.resolve(__dirname, '../../'),  // Uncomment and add 'import path from "path"' if needed
   /* config options here */
   serverExternalPackages: ['coze-coding-dev-sdk'],
@@ -14,14 +16,21 @@ const nextConfig: NextConfig = {
     return config;
   },
   allowedDevOrigins: ['*.dev.coze.site'],
-  images: {
-    remotePatterns: [
+  async headers() {
+    return [
       {
-        protocol: 'https',
-        hostname: '*',
-        pathname: '/**',
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'same-origin' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()',
+          },
+        ],
       },
-    ],
+    ];
   },
 };
 

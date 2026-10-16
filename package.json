@@ -3,13 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "auth:hash": "tsx scripts/hash-password.ts",
     "build": "bash ./scripts/build.sh",
+    "build:standalone": "next build --webpack && node scripts/prepare-standalone.mjs",
     "dev": "bash ./scripts/dev.sh",
     "preinstall": "npx only-allow pnpm",
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint/",
     "lint:build": "eslint . --quiet",
     "lint:style": "stylelint \"src/**/*.css\"",
     "start": "bash ./scripts/start.sh",
+    "start:standalone": "node .next/standalone/server.js",
+    "test": "tsx --test tests/auth-core.test.ts tests/storage.test.ts",
     "ts-check": "tsc -p tsconfig.json",
     "validate": "pnpm dlx concurrently --group --names lint-tsc,lint-build,lint-style \"pnpm ts-check\" \"pnpm lint:build\" \"pnpm lint:style\""
   },

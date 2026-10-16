@@ -1,12 +1,20 @@
 import { S3Storage } from "coze-coding-dev-sdk";
 
-const storage = new S3Storage({
-  endpointUrl: process.env.COZE_BUCKET_ENDPOINT_URL,
-  accessKey: "",
-  secretKey: "",
-  bucketName: process.env.COZE_BUCKET_NAME,
-  region: "cn-beijing",
-});
+let storage: S3Storage | undefined;
+
+function getStorage(): S3Storage {
+  if (!storage) {
+    storage = new S3Storage({
+      endpointUrl:
+        process.env.S3_ENDPOINT_URL ?? process.env.COZE_BUCKET_ENDPOINT_URL,
+      accessKey: process.env.S3_ACCESS_KEY_ID ?? "",
+      secretKey: process.env.S3_SECRET_ACCESS_KEY ?? "",
+      bucketName: process.env.S3_BUCKET_NAME ?? process.env.COZE_BUCKET_NAME,
+      region: process.env.S3_REGION ?? "cn-beijing",
+    });
+  }
+  return storage;
+}
 
 export interface FileInfo {
   key: string;
@@ -19,7 +27,17 @@ export interface FileInfo {
  * Sanitize filename: replace disallowed chars with underscore
  */
 function sanitizeFileName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._\-\u4e00-\u9fff]/g, "_");
+  const sanitized = name
+    .replace(/[^a-zA-Z0-9._\-\u4e00-\u9fff]/g, "_")
+    .slice(0, 180);
+  return sanitized && !/^\.+$/.test(sanitized) ? sanitized : "file";
+}
+
+export function isAllowedStorageKey(key: string): boolean {
+  return (
+    key.length <= 512 &&
+    /^uploads\/[^/\\\u0000-\u001f]+$/.test(key)
+  );
 }
 
 /**
@@ -42,10 +60,10 @@ export async function uploadFileToStorage(
   contentType: string
 ): Promise<{ key: string; originalName: string }> {
   const sanitized = sanitizeFileName(originalName);
-  const uuid = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+  const uuid = crypto.randomUUID();
   const fileName = `uploads/${uuid}_${sanitized}`;
 
-  const key = await storage.uploadFile({
+  const key = await getStorage().uploadFile({
     fileContent,
     fileName,
     contentType,
@@ -58,7 +76,10 @@ export async function uploadFileToStorage(
  * List all uploaded files
  */
 export async function listFilesFromStorage(): Promise<FileInfo[]> {
-  const result = await storage.listFiles({ prefix: "uploads/", maxKeys: 100 });
+  const result = await getStorage().listFiles({
+    prefix: "uploads/",
+    maxKeys: 100,
+  });
 
   const files: FileInfo[] = result.keys.map((k: string) => ({
     key: k,
@@ -77,12 +98,12 @@ export async function getDownloadUrl(
   key: string,
   expireTime: number = 3600
 ): Promise<string> {
-  return storage.generatePresignedUrl({ key, expireTime });
+  return getStorage().generatePresignedUrl({ key, expireTime });
 }
 
 /**
  * Delete a file from storage
  */
 export async function deleteFileFromStorage(key: string): Promise<boolean> {
-  return storage.deleteFile({ fileKey: key });
+  return getStorage().deleteFile({ fileKey: key });
 }

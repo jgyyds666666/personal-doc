@@ -11,6 +11,10 @@ Write-Host "Building the Next.js project..."
 & pnpm next build --webpack
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+Write-Host "Preparing standalone runtime files..."
+& node scripts/prepare-standalone.mjs
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 Write-Host "Bundling server with tsup..."
 & pnpm tsup src/server.ts --format cjs --platform node --target node20 --outDir dist --no-splitting --no-minify
 exit $LASTEXITCODE

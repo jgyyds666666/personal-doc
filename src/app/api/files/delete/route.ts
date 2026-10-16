@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteFileFromStorage } from "@/lib/storage";
+import { deleteFileFromStorage, isAllowedStorageKey } from "@/lib/storage";
+import { requireAuthenticatedMutation } from "@/lib/api-security";
+
+export const dynamic = "force-dynamic";
 
 export async function DELETE(request: NextRequest) {
+  const securityError = await requireAuthenticatedMutation(request);
+  if (securityError) {
+    return securityError;
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const key = searchParams.get("key");
 
-    if (!key) {
+    if (!key || !isAllowedStorageKey(key)) {
       return NextResponse.json(
-        { error: "File key is required" },
+        { error: "Invalid file key" },
         { status: 400 }
       );
     }

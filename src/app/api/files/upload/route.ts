@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { uploadFileToStorage } from "@/lib/storage";
+import { requireAuthenticatedMutation } from "@/lib/api-security";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  const securityError = await requireAuthenticatedMutation(request);
+  if (securityError) {
+    return securityError;
+  }
+
   try {
     const formData = await request.formData();
-    const file = formData.get("file") as File | null;
+    const file = formData.get("file");
 
-    if (!file) {
+    if (!(file instanceof File) || !file.name || file.name.length > 255) {
       return NextResponse.json(
-        { error: "No file provided" },
+        { error: "Invalid file" },
         { status: 400 }
       );
     }
@@ -24,15 +32,18 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const result = await uploadFileToStorage(buffer, file.name, file.type);
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        key: result.key,
-        originalName: result.originalName,
-        size: file.size,
-        uploadTime: new Date().toISOString(),
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          key: result.key,
+          originalName: result.originalName,
+          size: file.size,
+          uploadTime: new Date().toISOString(),
+        },
       },
-    });
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     console.error("Upload error:", error);
     return NextResponse.json(

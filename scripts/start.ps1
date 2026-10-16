@@ -7,5 +7,6 @@ Set-Location $workspace
 
 Write-Host "Starting HTTP service on port $port for deploy..."
 $env:PORT = "$port"
+$env:NODE_ENV = "production"
 & node dist/server.js
 exit $LASTEXITCODE
