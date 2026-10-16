@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import {
   createSessionToken,
+  hashPassword,
   verifyPassword,
   verifySessionToken,
 } from "@/lib/auth-core";
@@ -31,11 +32,22 @@ export async function isAuthenticated(): Promise<boolean> {
 }
 
 export async function verifyAdminPassword(password: string): Promise<boolean> {
-  const encodedHash = process.env.ADMIN_PASSWORD_HASH ?? "";
-  if (!encodedHash) {
-    throw new Error("缺少 ADMIN_PASSWORD_HASH");
+  // 兼容两种配置方式（二选一）：
+  //   1) ADMIN_PASSWORD_HASH —— 填入 scrypt$... 格式的哈希（最安全）
+  //   2) ADMIN_PASSWORD     —— 直接填明文密码，运行时自动转换为哈希（更易用）
+  const configured =
+    process.env.ADMIN_PASSWORD_HASH ?? process.env.ADMIN_PASSWORD ?? "";
+  if (!configured) {
+    throw new Error("缺少 ADMIN_PASSWORD_HASH 或 ADMIN_PASSWORD");
   }
-  return verifyPassword(password, encodedHash);
+
+  if (configured.startsWith("scrypt$")) {
+    return verifyPassword(password, configured);
+  }
+
+  // 明文密码分支：先把配置的明文实时哈希，再与用户输入比较
+  const expectedHash = await hashPassword(configured);
+  return verifyPassword(password, expectedHash);
 }
 
 export async function createSession(): Promise<void> {
