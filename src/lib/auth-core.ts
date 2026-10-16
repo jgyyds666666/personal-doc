@@ -42,8 +42,8 @@ function safeEqual(left: Buffer, right: Buffer): boolean {
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  if (password.length < 12) {
-    throw new Error("管理员密码至少需要 12 个字符");
+  if (password.length < 6) {
+    throw new Error("管理员密码至少需要 6 个字符");
   }
 
   const salt = randomBytes(16);

@@ -13,7 +13,7 @@
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm auth:hash -- "至少12位的管理员密码"
+pnpm auth:hash -- "至少6位的管理员密码"
 ```
 
 把生成结果填入 `.env.local` 的 `ADMIN_PASSWORD_HASH`，再设置至少 32 个字符的 `SESSION_SECRET`。完整变量见 `.env.example`。
