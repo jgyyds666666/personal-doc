@@ -9,14 +9,15 @@
 - S3 兼容对象存储
 - Standalone 生产构建和健康检查接口
 
-首次启动前必须完成登录配置：
+图形化部署时只需配置管理员密码和模式：
 
-```bash
-pnpm install --frozen-lockfile
-pnpm auth:hash -- "至少6位的管理员密码"
+```dotenv
+ADMIN_PASSWORD=至少6位的管理员密码
+ADMIN_PASSWORD_MODE=plain
+SESSION_SECRET=至少32个字符的独立随机值
 ```
 
-把生成结果填入 `.env.local` 的 `ADMIN_PASSWORD_HASH`，再设置至少 32 个字符的 `SESSION_SECRET`。完整变量见 `.env.example`。
+明文密码会在第一次登录时转换一次并缓存到进程内存，后续登录直接使用缓存的哈希校验。若希望直接配置哈希，可用 `pnpm auth:hash` 生成后仍填入 `ADMIN_PASSWORD`，并把模式改为 `hash`。完整变量见 `.env.example`。
 
 生产部署请阅读 [1 核 2G 部署说明](docs/DEPLOYMENT_1C2G.md)。
 

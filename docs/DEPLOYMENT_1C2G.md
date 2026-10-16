@@ -22,7 +22,9 @@ HOSTNAME=127.0.0.1
 PORT=5000
 NODE_OPTIONS=--max-old-space-size=640
 
-ADMIN_PASSWORD_HASH=scrypt$...
+# 图形化部署：直接填写明文，后端首次登录时转换一次并缓存
+ADMIN_PASSWORD=请替换为至少6位的管理员密码
+ADMIN_PASSWORD_MODE=plain
 SESSION_SECRET=请替换为至少32个随机字符
 
 S3_ENDPOINT_URL=https://对象存储端点
@@ -32,13 +34,19 @@ S3_ACCESS_KEY_ID=访问密钥ID
 S3_SECRET_ACCESS_KEY=访问密钥
 ```
 
-管理员密码哈希应在可信的本地环境生成：
+如果不希望部署平台保存明文，可在可信的本地环境生成哈希：
 
 ```bash
-pnpm auth:hash -- "至少12位的管理员密码"
+pnpm auth:hash -- "至少6位的管理员密码"
 ```
 
-不要把 `.env`、明文密码或密钥提交到 Git。
+然后把生成的 `scrypt$...` 填入 `ADMIN_PASSWORD`，并设置：
+
+```dotenv
+ADMIN_PASSWORD_MODE=hash
+```
+
+`plain` 模式只会清理当前 Node 进程中的环境变量引用，无法回写或删除图形化部署平台中保存的值。不要把 `.env`、明文密码或密钥提交到 Git。
 
 ## 3. 构建
 

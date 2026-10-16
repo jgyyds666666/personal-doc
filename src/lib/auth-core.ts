@@ -20,6 +20,14 @@ interface SessionPayload {
   v: number;
 }
 
+interface ParsedPasswordHash {
+  N: number;
+  r: number;
+  p: number;
+  salt: Buffer;
+  expected: Buffer;
+}
+
 function derivePasswordKey(
   password: string,
   salt: Buffer,
@@ -64,20 +72,17 @@ export async function hashPassword(password: string): Promise<string> {
   ].join("$");
 }
 
-export async function verifyPassword(
-  password: string,
-  encodedHash: string,
-): Promise<boolean> {
+function parsePasswordHash(encodedHash: string): ParsedPasswordHash | null {
   const parts = encodedHash.split("$");
   if (parts.length !== 6 || parts[0] !== "scrypt") {
-    return false;
+    return null;
   }
 
   const N = Number(parts[1]);
   const r = Number(parts[2]);
   const p = Number(parts[3]);
-  const salt = Buffer.from(parts[4], "hex");
-  const expected = Buffer.from(parts[5], "hex");
+  const saltHex = parts[4];
+  const expectedHex = parts[5];
 
   if (
     !Number.isInteger(N) ||
@@ -86,20 +91,49 @@ export async function verifyPassword(
     N < 2 ||
     r < 1 ||
     p < 1 ||
-    salt.length < 16 ||
-    expected.length < 32
+    !/^[0-9a-f]+$/i.test(saltHex) ||
+    !/^[0-9a-f]+$/i.test(expectedHex) ||
+    saltHex.length % 2 !== 0 ||
+    expectedHex.length % 2 !== 0
   ) {
+    return null;
+  }
+
+  const salt = Buffer.from(saltHex, "hex");
+  const expected = Buffer.from(expectedHex, "hex");
+  if (salt.length < 16 || expected.length < 32) {
+    return null;
+  }
+
+  return { N, r, p, salt, expected };
+}
+
+export function isPasswordHash(encodedHash: string): boolean {
+  return parsePasswordHash(encodedHash) !== null;
+}
+
+export async function verifyPassword(
+  password: string,
+  encodedHash: string,
+): Promise<boolean> {
+  const parsed = parsePasswordHash(encodedHash);
+  if (!parsed) {
     return false;
   }
 
   try {
-    const actual = await derivePasswordKey(password, salt, expected.length, {
-      N,
-      r,
-      p,
-      maxmem: 64 * 1024 * 1024,
-    });
-    return safeEqual(actual, expected);
+    const actual = await derivePasswordKey(
+      password,
+      parsed.salt,
+      parsed.expected.length,
+      {
+        N: parsed.N,
+        r: parsed.r,
+        p: parsed.p,
+        maxmem: 64 * 1024 * 1024,
+      },
+    );
+    return safeEqual(actual, parsed.expected);
   } catch {
     return false;
   }

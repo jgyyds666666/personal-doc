@@ -13,7 +13,7 @@
     "lint:style": "stylelint \"src/**/*.css\"",
     "start": "bash ./scripts/start.sh",
     "start:standalone": "node .next/standalone/server.js",
-    "test": "tsx --test tests/auth-core.test.ts tests/storage.test.ts",
+    "test": "tsx --test tests/admin-password.test.ts tests/auth-core.test.ts tests/storage.test.ts",
     "ts-check": "tsc -p tsconfig.json",
     "validate": "pnpm dlx concurrently --group --names lint-tsc,lint-build,lint-style \"pnpm ts-check\" \"pnpm lint:build\" \"pnpm lint:style\""
   },
