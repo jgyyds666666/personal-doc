@@ -63,3 +63,20 @@
 
 - 模板默认预装核心组件库 `shadcn/ui`，位于`src/components/ui/`目录下
 - Next.js 项目**必须默认**采用 shadcn/ui 组件、风格和规范，**除非用户指定用其他的组件和规范。**
+
+## 业务模块
+
+### File Vault - 文档上传下载
+
+- **功能**：文件上传（拖拽/点击）、文件列表、文件下载、文件删除
+- **存储**：使用 `coze-coding-dev-sdk` 的 S3Storage 对象存储
+- **核心文件**：
+  - `src/lib/storage.ts` — 存储工具（上传/列表/下载/删除）
+  - `src/app/api/files/upload/route.ts` — POST 上传文件（multipart/form-data）
+  - `src/app/api/files/route.ts` — GET 获取文件列表
+  - `src/app/api/files/download/route.ts` — GET 获取签名下载URL（参数: key）
+  - `src/app/api/files/delete/route.ts` — DELETE 删除文件（参数: key）
+  - `src/app/page.tsx` — 前端主页面（上传区+文件列表）
+- **文件命名规则**：`uploads/{uuid8}_{sanitizedOriginalName}`
+- **下载方式**：前端通过 fetch + blob 模式下载（签名URL跨域）
+- **扩展方向**：可引入数据库持久化文件元数据、用户权限、文件夹管理等
