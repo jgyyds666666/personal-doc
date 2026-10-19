@@ -137,13 +137,22 @@
 - 代码完成本地测试、静态检查、生产构建和匿名访问运行时检查。
 - 当前没有连接用户线上 S3，因此真实对象读取、覆盖和版本恢复仍需部署后验收。
 
+### 2026-10-19：Coze 存储兼容修复
+
+- 根据 `COZE_STORAGE_COMPATIBILITY.md` 复核线上 500 日志与客户端选择逻辑。
+- 增加统一存储适配：无真实凭据的 Coze 环境走 `S3Storage` 管理的代理客户端，第三方 S3 的全部操作使用原生客户端。
+- Coze 模式不再进入 AWS 默认凭证提供链，同时保留列表元数据、分页、原 key 覆盖和 ETag 冲突检测。
+- 增加 Coze、第三方 S3、默认凭证链和残缺凭据的配置选择测试。
+- 本地运行时探针确认 Coze 模式得到 SDK 占位凭据，不再触发 `CredentialsProviderError`。
+- 将 `coze-coding-dev-sdk` 精确锁定为已验证的 `0.7.32`，避免兼容入口被非预期升级破坏。
+
 ## 7. 验证记录
 
 实际执行结果：
 
 | 验证 | 结果 |
 | --- | --- |
-| `corepack pnpm test` | 14/14 通过 |
+| `corepack pnpm test` | 18/18 通过 |
 | `corepack pnpm ts-check` | 通过 |
 | `corepack pnpm lint:build` | 通过 |
 | `corepack pnpm lint:style` | 通过 |

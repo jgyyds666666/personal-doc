@@ -1,27 +1,18 @@
-import { S3Storage } from "coze-coding-dev-sdk";
-import { ListObjectsV2Command } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { detectEditableFile } from "@/lib/editable-files";
 import {
   getS3Client,
+  getS3Storage,
   getStorageBucketName,
   normalizeEtag,
+  readStorageConfig,
 } from "@/lib/s3-client";
-
-let storage: S3Storage | undefined;
-
-function getStorage(): S3Storage {
-  if (!storage) {
-    storage = new S3Storage({
-      endpointUrl:
-        process.env.S3_ENDPOINT_URL ?? process.env.COZE_BUCKET_ENDPOINT_URL,
-      accessKey: process.env.S3_ACCESS_KEY_ID ?? "",
-      secretKey: process.env.S3_SECRET_ACCESS_KEY ?? "",
-      bucketName: process.env.S3_BUCKET_NAME ?? process.env.COZE_BUCKET_NAME,
-      region: process.env.S3_REGION ?? "cn-beijing",
-    });
-  }
-  return storage;
-}
 
 export interface FileInfo {
   key: string;
@@ -77,11 +68,24 @@ export async function uploadFileToStorage(
   const uuid = crypto.randomUUID();
   const fileName = `uploads/${uuid}_${sanitized}`;
 
-  const key = await getStorage().uploadFile({
-    fileContent,
-    fileName,
-    contentType,
-  });
+  let key: string;
+  if (readStorageConfig().provider === "coze") {
+    key = await getS3Storage().uploadFile({
+      fileContent,
+      fileName,
+      contentType,
+    });
+  } else {
+    await getS3Client().send(
+      new PutObjectCommand({
+        Bucket: getStorageBucketName(),
+        Key: fileName,
+        Body: fileContent,
+        ContentType: contentType,
+      }),
+    );
+    key = fileName;
+  }
 
   return { key, originalName };
 }
@@ -138,12 +142,25 @@ export async function getDownloadUrl(
   key: string,
   expireTime: number = 3600
 ): Promise<string> {
-  return getStorage().generatePresignedUrl({ key, expireTime });
+  if (readStorageConfig().provider === "coze") {
+    return getS3Storage().generatePresignedUrl({ key, expireTime });
+  }
+  return getSignedUrl(
+    getS3Client(),
+    new GetObjectCommand({ Bucket: getStorageBucketName(), Key: key }),
+    { expiresIn: expireTime },
+  );
 }
 
 /**
  * Delete a file from storage
  */
 export async function deleteFileFromStorage(key: string): Promise<boolean> {
-  return getStorage().deleteFile({ fileKey: key });
+  if (readStorageConfig().provider === "coze") {
+    return getS3Storage().deleteFile({ fileKey: key });
+  }
+  await getS3Client().send(
+    new DeleteObjectCommand({ Bucket: getStorageBucketName(), Key: key }),
+  );
+  return true;
 }

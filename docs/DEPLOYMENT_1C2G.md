@@ -27,15 +27,20 @@ ADMIN_PASSWORD=请替换为至少6位的管理员密码
 ADMIN_PASSWORD_MODE=plain
 SESSION_SECRET=请替换为至少32个随机字符
 
-S3_ENDPOINT_URL=https://对象存储端点
-S3_BUCKET_NAME=存储桶名称
-S3_REGION=区域
-S3_ACCESS_KEY_ID=访问密钥ID
-S3_SECRET_ACCESS_KEY=访问密钥
-S3_FORCE_PATH_STYLE=false
+# Coze 部署会自动注入，无需配置访问密钥：
+COZE_BUCKET_ENDPOINT_URL=https://integration.coze.cn/coze-coding-s3proxy/v1
+COZE_BUCKET_NAME=存储桶名称
+
+# 迁移到第三方 S3 时改用以下变量：
+# S3_ENDPOINT_URL=https://对象存储端点
+# S3_BUCKET_NAME=存储桶名称
+# S3_REGION=区域
+# S3_ACCESS_KEY_ID=访问密钥ID
+# S3_SECRET_ACCESS_KEY=访问密钥
+# S3_FORCE_PATH_STYLE=false
 ```
 
-文件列表和在线文本编辑使用标准 S3 API 获取对象真实元数据并覆盖原 key。部分 S3 兼容服务需要把 `S3_FORCE_PATH_STYLE` 设为 `true`；AWS S3 通常保持 `false`。部署后应实际验证文件列表、文本读取和保存。为避免误覆盖无法恢复，启用编辑功能前应在对象存储控制台开启版本控制。
+存储入口会自动选择适配方式：只有 Coze 端点且没有真实密钥时，通过 `S3Storage` 管理的代理客户端访问；配置 `S3_ENDPOINT_URL` 或真实 S3 凭据时，使用标准 S3 客户端。文件列表和在线文本编辑仍会获取对象真实元数据并覆盖原 key。部分第三方 S3 兼容服务需要把 `S3_FORCE_PATH_STYLE` 设为 `true`；AWS S3 通常保持 `false`。部署后应实际验证文件列表、文本读取和保存。为避免误覆盖无法恢复，启用编辑功能前应在对象存储控制台开启版本控制。
 
 如果不希望部署平台保存明文，可在可信的本地环境生成哈希：
 
