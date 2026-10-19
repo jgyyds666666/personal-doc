@@ -1,4 +1,11 @@
 import { S3Storage } from "coze-coding-dev-sdk";
+import { ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { detectEditableFile } from "@/lib/editable-files";
+import {
+  getS3Client,
+  getStorageBucketName,
+  normalizeEtag,
+} from "@/lib/s3-client";
 
 let storage: S3Storage | undefined;
 
@@ -21,6 +28,16 @@ export interface FileInfo {
   originalName: string;
   size: number;
   uploadTime: string;
+  etag: string;
+  editable: boolean;
+  editableReason?: "unsupported-format" | "file-too-large";
+  language: string | null;
+}
+
+export interface FileListResult {
+  files: FileInfo[];
+  nextCursor?: string;
+  isTruncated: boolean;
 }
 
 /**
@@ -34,17 +51,14 @@ function sanitizeFileName(name: string): string {
 }
 
 export function isAllowedStorageKey(key: string): boolean {
-  return (
-    key.length <= 512 &&
-    /^uploads\/[^/\\\u0000-\u001f]+$/.test(key)
-  );
+  return key.length <= 512 && /^uploads\/[^/\\\u0000-\u001f]+$/.test(key);
 }
 
 /**
  * Parse file key to extract original name
  * Key format: uploads/{uuid}_{originalName}
  */
-function parseOriginalName(key: string): string {
+export function parseOriginalName(key: string): string {
   const fileName = key.split("/").pop() || "";
   const uuidEnd = fileName.indexOf("_");
   if (uuidEnd === -1) return fileName;
@@ -75,20 +89,46 @@ export async function uploadFileToStorage(
 /**
  * List all uploaded files
  */
-export async function listFilesFromStorage(): Promise<FileInfo[]> {
-  const result = await getStorage().listFiles({
-    prefix: "uploads/",
-    maxKeys: 100,
-  });
+export async function listFilesFromStorage(options: {
+  cursor?: string;
+  maxKeys?: number;
+} = {}): Promise<FileListResult> {
+  const maxKeys = Math.min(Math.max(options.maxKeys ?? 50, 1), 100);
+  const result = await getS3Client().send(
+    new ListObjectsV2Command({
+      Bucket: getStorageBucketName(),
+      Prefix: "uploads/",
+      MaxKeys: maxKeys,
+      ContinuationToken: options.cursor,
+    }),
+  );
 
-  const files: FileInfo[] = result.keys.map((k: string) => ({
-    key: k,
-    originalName: parseOriginalName(k),
-    size: 0,
-    uploadTime: new Date().toISOString(),
-  }));
+  const files: FileInfo[] = [];
+  for (const item of result.Contents ?? []) {
+    const key = item.Key;
+    if (!key || !isAllowedStorageKey(key)) {
+      continue;
+    }
+    const originalName = parseOriginalName(key);
+    const size = item.Size ?? 0;
+    const detection = detectEditableFile(originalName, size);
+    files.push({
+      key,
+      originalName,
+      size,
+      uploadTime: item.LastModified?.toISOString() ?? "",
+      etag: normalizeEtag(item.ETag),
+      editable: detection.editable,
+      editableReason: detection.reason,
+      language: detection.language,
+    });
+  }
 
-  return files;
+  return {
+    files,
+    nextCursor: result.NextContinuationToken,
+    isTruncated: result.IsTruncated ?? false,
+  };
 }
 
 /**

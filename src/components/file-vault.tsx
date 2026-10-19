@@ -7,10 +7,14 @@ interface FileInfo {
   originalName: string;
   size: number;
   uploadTime: string;
+  etag: string;
+  editable: boolean;
+  editableReason?: "unsupported-format" | "file-too-large";
+  language: string | null;
 }
 
 function formatFileSize(bytes: number): string {
-  if (bytes === 0) return "--";
+  if (bytes === 0) return "0 B";
   const units = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
@@ -63,6 +67,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const redirectIfUnauthorized = (response: Response): boolean => {
@@ -73,21 +79,45 @@ export default function Home() {
     return true;
   };
 
-  const fetchFiles = useCallback(async () => {
+  const fetchFiles = useCallback(async (cursor?: string) => {
+    const append = Boolean(cursor);
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     try {
-      const res = await fetch("/api/files");
+      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+      const res = await fetch(`/api/files${query}`, { cache: "no-store" });
       if (res.status === 401) {
         window.location.assign("/login");
         return;
       }
-      const json = await res.json();
+      const json = (await res.json()) as {
+        success?: boolean;
+        data?: FileInfo[];
+        error?: string;
+        pagination?: { nextCursor?: string; hasMore?: boolean };
+      };
       if (json.success) {
-        setFiles(json.data);
+        const incoming = json.data ?? [];
+        setFiles((current) => (append ? [...current, ...incoming] : incoming));
+        setNextCursor(
+          json.pagination?.hasMore
+            ? (json.pagination.nextCursor ?? null)
+            : null,
+        );
+      } else {
+        setError(json.error ?? "加载文件失败");
       }
     } catch {
-      setError("Failed to load files");
+      setError("加载文件失败");
     } finally {
-      setLoading(false);
+      if (append) {
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -118,10 +148,10 @@ export default function Home() {
 
         const json = await res.json();
         if (!json.success) {
-          setError(`Upload failed: ${file.name}`);
+          setError(`上传失败：${file.name}`);
         }
       } catch {
-        setError(`Upload failed: ${file.name}`);
+        setError(`上传失败：${file.name}`);
       }
       completed++;
       setUploadProgress(Math.round((completed / fileArr.length) * 100));
@@ -141,7 +171,7 @@ export default function Home() {
       const json = await res.json();
 
       if (!json.success) {
-        setError("Failed to get download URL");
+        setError("无法获取下载地址");
         return;
       }
 
@@ -151,7 +181,7 @@ export default function Home() {
       link.rel = "noopener noreferrer";
       link.click();
     } catch {
-      setError("Download failed");
+      setError("下载失败");
     }
   };
 
@@ -172,7 +202,7 @@ export default function Home() {
         setFiles((prev) => prev.filter((f) => f.key !== key));
       }
     } catch {
-      setError("Delete failed");
+      setError("删除失败");
     } finally {
       setDeletingKey(null);
     }
@@ -262,7 +292,7 @@ export default function Home() {
             <div className="space-y-3">
               <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-[#E5E7EB] border-t-[#3730A3]" />
               <div className="text-sm text-[#6B7280]">
-                Uploading... {uploadProgress}%
+                正在上传… {uploadProgress}%
               </div>
               <div className="mx-auto h-1.5 w-48 overflow-hidden rounded-full bg-[#E5E7EB]">
                 <div
@@ -289,11 +319,11 @@ export default function Home() {
                 </svg>
               </div>
               <p className="text-sm text-[#374151]">
-                <span className="font-medium text-[#3730A3]">Click to upload</span>{" "}
-                or drag and drop
+                <span className="font-medium text-[#3730A3]">点击上传</span>{" "}
+                或将文件拖到这里
               </p>
               <p className="text-xs text-[#9CA3AF]">
-                Max file size: 50MB
+                单个文件最大 50 MB
               </p>
             </div>
           )}
@@ -307,7 +337,7 @@ export default function Home() {
               onClick={() => setError(null)}
               className="ml-2 font-medium underline"
             >
-              Dismiss
+              关闭
             </button>
           </div>
         )}
@@ -316,7 +346,7 @@ export default function Home() {
         <section className="mt-8">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-medium text-[#111827]">
-              Files
+              文件
               {files.length > 0 && (
                 <span className="ml-2 text-sm font-normal text-[#9CA3AF]">
                   ({files.length})
@@ -325,10 +355,10 @@ export default function Home() {
             </h2>
             {files.length > 0 && (
               <button
-                onClick={fetchFiles}
+                onClick={() => void fetchFiles()}
                 className="text-xs text-[#6B7280] hover:text-[#3730A3] transition-colors"
               >
-                Refresh
+                刷新
               </button>
             )}
           </div>
@@ -345,7 +375,7 @@ export default function Home() {
           ) : files.length === 0 ? (
             <div className="rounded-lg border border-[#E5E7EB] bg-white py-16 text-center">
               <p className="text-sm text-[#9CA3AF]">
-                No files yet. Upload your first document above.
+                暂无文件，请先上传一个文件。
               </p>
             </div>
           ) : (
@@ -378,10 +408,43 @@ export default function Home() {
 
                   {/* Actions */}
                   <div className="flex shrink-0 items-center gap-1">
+                    {file.editable && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.location.assign(
+                            `/edit?key=${encodeURIComponent(file.key)}`,
+                          )
+                        }
+                        className="rounded-md p-2 text-[#6B7280] transition-colors hover:bg-indigo-50 hover:text-[#3730A3]"
+                        title="编辑"
+                        aria-label={`编辑 ${file.originalName}`}
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth={1.5}
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zM16.862 4.487L19.5 7.125"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M18 14.25v4.125A2.625 2.625 0 0115.375 21H5.625A2.625 2.625 0 013 18.375V8.625A2.625 2.625 0 015.625 6H9.75"
+                          />
+                        </svg>
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDownload(file)}
                       className="rounded-md p-2 text-[#6B7280] transition-colors hover:bg-[#F3F4F6] hover:text-[#3730A3]"
-                      title="Download"
+                      title="下载"
+                      aria-label={`下载 ${file.originalName}`}
                     >
                       <svg
                         className="h-4 w-4"
@@ -401,7 +464,8 @@ export default function Home() {
                       onClick={() => handleDelete(file.key)}
                       disabled={deletingKey === file.key}
                       className="rounded-md p-2 text-[#6B7280] transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
-                      title="Delete"
+                      title="删除"
+                      aria-label={`删除 ${file.originalName}`}
                     >
                       <svg
                         className="h-4 w-4"
@@ -420,6 +484,18 @@ export default function Home() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          {nextCursor && (
+            <div className="mt-5 text-center">
+              <button
+                type="button"
+                disabled={loadingMore}
+                onClick={() => void fetchFiles(nextCursor)}
+                className="rounded-lg border border-[#E5E7EB] bg-white px-4 py-2 text-sm text-[#6B7280] transition-colors hover:border-[#3730A3]/30 hover:text-[#3730A3] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loadingMore ? "正在加载…" : "加载更多"}
+              </button>
             </div>
           )}
         </section>

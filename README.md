@@ -5,6 +5,9 @@
 - 管理员密码登录，不开放注册
 - HttpOnly 签名会话及登录失败限流
 - 文件列表、上传、下载和删除接口鉴权
+- TXT、Markdown、JSON、CSV 与常见代码文件在线编辑
+- Markdown 安全预览、UTF-8 BOM/换行保持和 ETag 冲突保护
+- 文件真实大小、修改时间和游标分页
 - 上传、删除和登录请求的同源校验
 - S3 兼容对象存储
 - Standalone 生产构建和健康检查接口
@@ -20,6 +23,8 @@ SESSION_SECRET=至少32个字符的独立随机值
 明文密码会在第一次登录时转换一次并缓存到进程内存，后续登录直接使用缓存的哈希校验。若希望直接配置哈希，可用 `pnpm auth:hash` 生成后仍填入 `ADMIN_PASSWORD`，并把模式改为 `hash`。完整变量见 `.env.example`。
 
 生产部署请阅读 [1 核 2G 部署说明](docs/DEPLOYMENT_1C2G.md)。
+
+文本编辑实现范围见 [文本与代码文件编辑方案](docs/TEXT_AND_CODE_FILE_EDITOR_PLAN.md)，后续目录、标签、全文检索和可选 AI 问答见 [知识库功能实施方案](docs/KNOWLEDGE_BASE_IMPLEMENTATION_PLAN.md)。
 
 ## 原始项目说明
 
