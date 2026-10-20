@@ -159,3 +159,34 @@ COZE_BUCKET_NAME=...
 - 第三方 S3 模式的上传、签名下载、列表、编辑和删除全部使用原生客户端，支持显式密钥、临时会话令牌、path-style，以及 AWS 默认凭证链。
 - 保留标准 S3 命令获取真实 `Size`、`LastModified`、`ETag`、分页 cursor，并支持编辑器覆盖原 key。
 - `tests/s3-client.test.ts` 覆盖自动选择与错误配置；线上仍需按第 6 节完成真实代理端点的全链路验收。
+
+---
+
+## 8. 运行时配置要点（Coze 部署，务必注意）
+
+> 源码修复到位后，**部署环境变量配置**仍可能让用户踩同一个坑。本节来自实测。
+
+### 8.1 `provider` 的判定条件（`src/lib/s3-client.ts`）
+
+```ts
+const provider: StorageProvider =
+  !accessKeyId && !secretAccessKey && !explicitS3Endpoint && cozeEndpoint
+    ? "coze"
+    : "s3";
+```
+
+即：**只要显式设置了 `S3_ENDPOINT_URL`（哪怕值和 `COZE_BUCKET_ENDPOINT_URL` 一模一样），`explicitS3Endpoint` 就非空，`provider` 会被判定为 `s3`**，从而走原生 `S3Client` + 占位/空凭证，最终仍报 `CredentialsProviderError: Could not load credentials from any providers`，文件列表/编辑功能 500。
+
+### 8.2 结论（Coze 环境）
+
+- **不要**在 `.env.local` / 部署表单中配置 `S3_ENDPOINT_URL`、`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY`。
+- 让存储**完全依赖 Coze 自动注入的 `COZE_BUCKET_ENDPOINT_URL` / `COZE_BUCKET_NAME`**，这样 `provider === "coze"`，走 `S3Storage` 代理客户端，无需凭证。
+- `S3_REGION` 不影响 `provider` 判定；不配置时默认 `cn-beijing`，一般无需设置。
+- **仅当你真正要接第三方 S3 兼容存储时**，才显式配置完整 `S3_*`（端点 + 密钥）。
+
+### 8.3 验证
+
+```bash
+# 配置正确（无 S3_*）时，登录后列表应返回数据而非 500
+curl -b /tmp/ck.txt http://localhost:5000/api/files   # 期望 success:true
+```
